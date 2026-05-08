@@ -4,7 +4,7 @@
 
 ## 🚀 Quick Start
 
-1. **Running Nginx Sync**:
+1. **Running nginx-sync**:
 
     *Running from Source*
     
@@ -12,7 +12,7 @@
     
     b. **Setup Python Virtual Environment on Linux**
     ```bash
-      cd /project/folder
+      cd nginx-sync
       python -m venv .venv
       source .venv/bin/activate
       pip install -r requirements.txt
@@ -21,7 +21,7 @@
     ```
     c. **Setup Python Virtual Environment on Windows**
     ```bash
-      cd /project/folder
+      cd nginx-sync
       python -m venv .venv
       ./.venv/Scripts/activate
       pip install -r requirements.txt
@@ -30,7 +30,7 @@
     ```
 
 ## Script Arguments
-You can call Nginx Sync with several arguments.
+You can call `nginx-sync` with several arguments.
 Command line arguments will override properties in config.yaml.
 To see all arguments type:
 python3 main.py -h
