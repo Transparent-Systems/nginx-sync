@@ -57,7 +57,7 @@ python main.py -h
 * Nginx credentials stored in .env file
 * Source and target Nginx server details stored in config.yaml file
 * Log configuration stored in log.yaml file
-* Nginx Sync can handle one ore more target servers
+* Nginx Sync can handle one or more target servers
  
 
 
@@ -66,7 +66,7 @@ python main.py -h
 * Nginx credentials stored in .env file
 * Source and target Nginx server details stored in config.yaml file
 * Log configuration stored in log.yaml file
-* Nginx Sync can handle one ore more target servers
+* Nginx Sync can handle one or more target servers
  
 
 ## License
@@ -81,9 +81,9 @@ The use case for Nginx Sync is:
 - The Cloudflare tunnel connects to a Nginx server that forwards request to web servers, cloud server etc.
 - You have 2 or more servers configured with a combo of {cloudflared and Nginx server}
   This provides failover in case one of the servers goes down.
-- Now, when make changes to the main Nginx server, you want to propagate thoe changes to the other Nginx servers on your network
+- Now, when make changes to the main Nginx server, you want to propagate those changes to the other Nginx servers on your network
 
-Nginx Sync retrieves the proxy hosts of the source Nginx server, checks if there have been any changes ane propagates those changes to all target Nginx servers.
+Nginx Sync retrieves the proxy hosts of the source Nginx server, checks if there have been any changes and propagates those changes to all target Nginx servers.
 
 
 ## Acknowledgments
