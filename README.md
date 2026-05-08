@@ -11,9 +11,12 @@
     a. **Install Python**: Download from [python.org](https://www.python.org/downloads/).
 
     b. **Download nginx-sync from Github**
-      For example type command:
+
+      ```bash
+      For example type command:  
       git clone https://github.com/Transparent-Systems/nginx-sync.git 
-    
+      ```
+          
     c. **Create file .env and add two lines**
     ```bash
       Example content of .env:
