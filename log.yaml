@@ -1,0 +1,8 @@
+version: 1.0.0
+logging:
+  file_name: nginx_sync.log
+  folder: logs
+  max_bytes: 10485760
+  max_backup_count: 3
+  # log_level: DEBUG | INFO | WARNING | ERROR | CRITICAL
+  log_level: INFO

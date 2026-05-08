@@ -1,0 +1,39 @@
+# Python bytecode and cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environments and Dependencies
+.env
+.venv/
+venv/
+ENV/
+env/
+bin/
+lib/
+include/
+share/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# IDE - VS Code
+# We ignore the folder but keep the specific config files you are using
+.vscode/
+
+# Testing and Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# Operating System specific files
+.DS_Store
+Thumbs.db
+desktop.ini

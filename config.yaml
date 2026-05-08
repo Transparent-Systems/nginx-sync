@@ -1,0 +1,13 @@
+source:
+  url: "http://192.168.1.51:81/api"
+
+targets:
+  - name: "NAS2-Nginx"
+    url: "http://192.168.1.52:81/api"
+  - name: "DEV-Nginx"
+    url: "http://192.168.1.93:81/api"
+  # - name: "NAS3-Nginx"
+  #   url: "http://192.168.1.53:81/api"
+  #   auth_payload:
+  #     identity: "admin"
+  #     secret: "admin123"
