@@ -9,17 +9,30 @@
     *Running from Source*
     
     a. **Install Python**: Download from [python.org](https://www.python.org/downloads/).
+
+    b. **Download nginx-sync from Github**
+      For example type command:
+      git clone https://github.com/Transparent-Systems/nginx-sync.git 
     
-    b. **Setup Python Virtual Environment on Linux**
+    c. **Create file .env and add two lines**
+    ```bash
+      Example content of .env:
+      NPM_IDENTITY=your_identity
+      NPM_SECRET=your_secret
+    ```
+  
+    d. **Setup Python Virtual Environment on Linux**
     ```bash
       cd nginx-sync
       python -m venv .venv
       source .venv/bin/activate
       pip install -r requirements.txt
+      Create file .env and add two lines. For example:
+
       Run main.py:
       python3 main.py
     ```
-    c. **Setup Python Virtual Environment on Windows**
+    e. **Setup Python Virtual Environment on Windows**
     ```bash
       cd nginx-sync
       python -m venv .venv
