@@ -80,7 +80,7 @@ The use case for Nginx Sync is:
 - You run servers behind a cloudflare tunnel using a cloudflared daemon
 - The Cloudflare tunnel connects to a Nginx server that forwards request to web servers, cloud server etc.
 - You have 2 or more servers configured with a combo of {cloudflared and Nginx server}
-  This provides failover in case one of the servers goes down.
+  This provides High Availability (HA) and Load Balancing; if one server goes down, traffic continues to flow through the others.
 - Now, when make changes to the main Nginx server, you want to propagate those changes to the other Nginx servers on your network
 
 Nginx Sync retrieves the proxy hosts of the source Nginx server, checks if there have been any changes and propagates those changes to all target Nginx servers.
