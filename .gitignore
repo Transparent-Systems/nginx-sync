@@ -20,6 +20,9 @@ share/
 dist/
 build/
 *.egg-info/
+# Locally built binary (build output belongs in dist/; see build_project.py)
+/nginx-sync
+/nginx-sync.exe
 
 # IDE - VS Code
 # We ignore the folder but keep the specific config files you are using

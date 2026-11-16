@@ -9,6 +9,7 @@
     *Running from Source*
     
     a. **Install Python**: Download from [python.org](https://www.python.org/downloads/).
+       Python 3.10 or newer is required (the release binary is built with 3.12).
 
     b. **Download nginx-sync from Github**
 
@@ -27,7 +28,7 @@
     d. **Setup Python Virtual Environment on Linux**
     ```bash
       cd nginx-sync
-      python -m venv .venv
+      python3.12 -m venv .venv        # any Python 3.10 or newer
       source .venv/bin/activate
       pip install -r requirements.txt
       Create file .env and add two lines. For example:
@@ -45,6 +46,47 @@
       python main.py
     ```
 
+## 📦 Prebuilt Linux Binary
+
+Every release tag builds a self-contained Linux binary (no Python needed on the
+server), see `.github/workflows/build-linux.yml`.
+
+1. Download `nginx-sync` and `nginx-sync.sha256` from the
+   [Releases](https://github.com/Transparent-Systems/nginx-sync/releases) page.
+
+2. Verify the download and make it executable (the executable bit is not kept
+   by the download):
+
+    ```bash
+    sha256sum -c nginx-sync.sha256
+    chmod +x nginx-sync
+    ```
+
+3. Put `config.yaml`, `log.yaml` and `.env` next to the binary — they are read
+   from the binary's own folder, not from the current directory — and start it:
+
+    ```bash
+    ./nginx-sync -p 30
+    ```
+
+    To keep the configuration somewhere else (with the binary in
+    `/usr/local/bin`, for example), name that folder instead:
+
+    ```bash
+    ./nginx-sync --config-dir /etc/nginx-sync -p 30
+    ```
+
+    `./nginx-sync -h` lists all arguments and `./nginx-sync --version` prints the
+    version from `log.yaml`. Logs are written to the `logs` folder inside the
+    configuration folder.
+
+The binary is built in a Debian bullseye container (glibc 2.31), so it runs on
+Ubuntu 22.04 and newer, Debian 11 and newer, and RHEL 9 and newer, on x86_64.
+To build it yourself run `.venv/bin/python build_project.py` (see
+`.venv/bin/python build_project.py -h`). Name the virtualenv interpreter
+explicitly: after `source .venv/bin/activate`, a `python` that comes from pyenv
+or the system may still be older than the 3.10 that `requirements.txt` needs.
+
 ## Script Arguments
 You can call `nginx-sync` with several arguments.
 Command line arguments will override properties in config.yaml.
@@ -52,6 +94,14 @@ To see all arguments type:
 python3 main.py -h
 OR on Windows:
 python main.py -h
+
+| Argument | Description |
+| -------- | ----------- |
+| `-p`, `--period <SECONDS>` | Seconds between syncs (default 30; `0` syncs once and exits) |
+| `-l`, `--log-level <LEVEL>` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` or `NONE` |
+| `--dry-run` | Report what would change; the target servers are left untouched |
+| `--config-dir <PATH>` | Folder holding `config.yaml`, `log.yaml` and `.env` (default: the folder of the binary, or of `main.py` when run from source) |
+| `--version` | Print the version recorded in `log.yaml` and exit |
 
 
 * Nginx credentials stored in .env file

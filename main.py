@@ -4,6 +4,8 @@ import requests
 import json
 import yaml
 import os
+import signal
+import sys
 import dotenv
 import logging
 from typing import List, Dict, Any, Optional, Set, Union
@@ -30,21 +32,42 @@ NPM_IDENTITY=your_identity
 NPM_SECRET=your_secret
 """
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+def get_script_dir() -> str:
+    """
+    Returns the folder holding config.yaml, log.yaml and .env.
+
+    A PyInstaller build unpacks main.py into a temporary folder, so __file__
+    points there instead of the folder the binary was started from. The folder
+    of the executable is the one the user put the configuration files in, so
+    that is what a frozen binary has to use.
+    """
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+SCRIPT_DIR = get_script_dir()
 dotenv.load_dotenv(os.path.join(SCRIPT_DIR, '.env'))
 
 def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     if config_path is None:
-        config_path = os.path.join(SCRIPT_DIR, "config.yaml")
-    with open(config_path, 'r') as file:
-        return yaml.safe_load(file)
+        config_path = os.path.join(SETTINGS_DIR, "config.yaml")
+    try:
+        with open(config_path, 'r') as file:
+            return yaml.safe_load(file)
+    except FileNotFoundError:
+        # The binary ships without configuration, so this is the first thing a
+        # new user hits. Explain what is missing instead of showing a traceback.
+        print(f"ERROR: configuration file not found: {config_path}", file=sys.stderr)
+        print(f"Copy config.yaml, log.yaml and .env into {os.path.dirname(config_path)},", file=sys.stderr)
+        print("or name another folder with --config-dir <PATH>.", file=sys.stderr)
+        sys.exit(2)
 
 def setup_logging(log_config_path: Optional[str] = None) -> logging.Logger:
     """
     Sets up a revolving file logger and a console logger based on the provided YAML configuration.
     """
     if log_config_path is None:
-        log_config_path = os.path.join(SCRIPT_DIR, "log.yaml")
+        log_config_path = os.path.join(SETTINGS_DIR, "log.yaml")
         
     try:
         with open(log_config_path, 'r') as file:
@@ -54,7 +77,7 @@ def setup_logging(log_config_path: Optional[str] = None) -> logging.Logger:
 
     log_folder = log_cfg.get('folder', 'logs')
     if not os.path.isabs(log_folder):
-        log_folder = os.path.join(SCRIPT_DIR, log_folder)
+        log_folder = os.path.join(SETTINGS_DIR, log_folder)
 
     if not os.path.exists(log_folder):
         os.makedirs(log_folder)
@@ -86,10 +109,64 @@ def setup_logging(log_config_path: Optional[str] = None) -> logging.Logger:
 
     return logger
 
-CONFIG: Dict[str, Any] = load_config()
-SOURCE_CONFIG: Dict[str, Any] = CONFIG.get('source', {})
-TARGETS: List[Dict[str, Any]] = CONFIG.get('targets', [])
-logger: logging.Logger = setup_logging()
+# Version metadata. log.yaml already records the version; build_project.py and
+# utils/release_notes.py read the same field, so --version and a release cannot
+# disagree about it.
+VERSION_FILE = "log.yaml"
+FALLBACK_VERSION = "unknown"
+
+# Populated by load_settings() once the command line has been parsed: the folder
+# that holds config.yaml is itself a command line option, so nothing can be read
+# at import time.
+SETTINGS_DIR: str = SCRIPT_DIR
+CONFIG: Dict[str, Any] = {}
+SOURCE_CONFIG: Dict[str, Any] = {}
+TARGETS: List[Dict[str, Any]] = []
+logger: logging.Logger = logging.getLogger("nginx_sync")
+
+
+def read_version(directory: Optional[str] = None) -> str:
+    """
+    Returns the version recorded in log.yaml, or "unknown" when it cannot be read.
+
+    The folder holding the configuration wins. A binary shipped without one falls
+    back to the log.yaml bundled into it at build time (see build_project.py), so
+    a freshly downloaded nginx-sync can still report its version.
+    """
+    candidates: List[str] = [directory or SETTINGS_DIR]
+    bundled = getattr(sys, '_MEIPASS', None)
+    if bundled and bundled not in candidates:
+        candidates.append(bundled)
+
+    for base in candidates:
+        path = os.path.join(base, VERSION_FILE)
+        try:
+            with open(path, 'r') as file:
+                version = (yaml.safe_load(file) or {}).get('version')
+        except (OSError, yaml.YAMLError):
+            continue
+        if version:
+            return str(version)
+
+    return FALLBACK_VERSION
+
+
+def load_settings(config_dir: Optional[str] = None) -> None:
+    """
+    Loads .env, config.yaml and log.yaml from the folder that holds them.
+
+    .env is read first so credentials are available for the endpoints that take
+    them from the environment, and the relative log folder in log.yaml is
+    resolved against that same directory rather than against the binary.
+    """
+    global SETTINGS_DIR, CONFIG, SOURCE_CONFIG, TARGETS, logger
+
+    SETTINGS_DIR = os.path.abspath(config_dir) if config_dir else SCRIPT_DIR
+    dotenv.load_dotenv(os.path.join(SETTINGS_DIR, '.env'))
+    CONFIG = load_config(os.path.join(SETTINGS_DIR, "config.yaml"))
+    SOURCE_CONFIG = CONFIG.get('source', {})
+    TARGETS = CONFIG.get('targets', [])
+    logger = setup_logging(os.path.join(SETTINGS_DIR, "log.yaml"))
 
 # Fields returned by NPM API that should not be sent back in creation/update payloads
 EXCLUDED_KEYS: Set[str] = {'id', 'owner_user_id', 'created_on', 'modified_on', 'user'}
@@ -102,6 +179,29 @@ def get_auth_payload(config_node: Dict[str, Any]) -> Dict[str, Any]:
         "identity": os.getenv("NPM_IDENTITY"),
         "secret": os.getenv("NPM_SECRET")
     }
+
+def missing_credentials() -> List[str]:
+    """
+    Returns the source or targets that have no identity/secret to log in with.
+
+    NPM answers a token request without credentials with "400 Bad Request", so
+    without this check a missing .env shows up as a wall of failed logins every
+    sync cycle instead of one error that names the cause.
+    """
+    endpoints: List[Any] = [("source", SOURCE_CONFIG)]
+    endpoints.extend((target.get('name', target['url']), target) for target in TARGETS)
+
+    missing: List[str] = []
+    for name, node in endpoints:
+        payload = get_auth_payload(node)
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except json.JSONDecodeError:
+                payload = {}
+        if not payload.get('identity') or not payload.get('secret'):
+            missing.append(name)
+    return missing
 
 def main(period: int = 60, dry_run: bool = False) -> None:
     mode_str = " (DRY RUN MODE)" if dry_run else ""
@@ -218,31 +318,55 @@ def main(period: int = 60, dry_run: bool = False) -> None:
                 logger.info(f"Sync completed. Next sync in {period} seconds.")
             time.sleep(period)
     except KeyboardInterrupt:
-        logger.info("Sync process interrupted by user. Exiting gracefully.")
+        # The shutdown itself lives in cli(): logging from inside this handler
+        # is what used to leave a traceback, because a second Ctrl-C (the
+        # bootloader forwards the first) interrupted the log call.
+        raise
+
+def describe_http_failure(response: requests.Response) -> str:
+    """
+    Returns the reason NPM gave for rejecting a request.
+
+    raise_for_status() only reports "400 Client Error", which hides the bit that
+    matters: NPM answers 400 when identity or secret is missing from the payload
+    and names the offending field in the response body.
+    """
+    detail = " ".join(response.text.split())[:300]
+    return f"HTTP {response.status_code}" + (f": {detail}" if detail else "")
 
 def get_token(url: str, auth_payload: Union[Dict[str, Any], str, None] = None) -> Optional[str]:
     """
     Obtains an authentication token from the NPM instance at the given URL using the provided payload.
     """
-    try:
-        if auth_payload:
-            # Handle both dict (from YAML) and string (fallback)
-            payload: Dict[str, Any] = auth_payload if isinstance(auth_payload, dict) else json.loads(auth_payload)
-        else:
-            # If no payload provided in YAML, use defaults from .env
-            payload = {
-                "identity": os.getenv("NPM_IDENTITY"),
-                "secret": os.getenv("NPM_SECRET")
-            }
+    if isinstance(auth_payload, str):
+        # Handle both dict (from YAML) and string (fallback)
+        try:
+            auth_payload = json.loads(auth_payload)
+        except json.JSONDecodeError:
+            logger.error("Error: auth_payload in config.yaml is not valid JSON.")
+            return None
 
+    # If no payload provided in YAML, use defaults from .env
+    payload: Dict[str, Any] = auth_payload or {
+        "identity": os.getenv("NPM_IDENTITY"),
+        "secret": os.getenv("NPM_SECRET")
+    }
+
+    try:
         response = requests.post(f"{url}/tokens", json=payload, timeout=DEFAULT_TIMEOUT)
-        response.raise_for_status()
-        return response.json().get('token')
-    except json.JSONDecodeError:
-        logger.error("Error: AUTH_PAYLOAD in .env is not valid JSON.")
     except requests.exceptions.RequestException as e:
         logger.error(f"Error obtaining token from {url}: {e}")
-    return None
+        return None
+
+    if not response.ok:
+        logger.error(f"Authentication with {url} failed: {describe_http_failure(response)}")
+        return None
+
+    try:
+        return response.json().get('token')
+    except ValueError:
+        logger.error(f"Authentication with {url} did not return JSON.")
+        return None
 
 def add_proxy_host(session: requests.Session, url: str, host_config: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
@@ -381,7 +505,8 @@ def should_update(source_host: Dict[str, Any], target_host: Dict[str, Any]) -> b
     ]
     return any(source_host.get(key) != target_host.get(key) for key in relevant_keys)
 
-if __name__ == "__main__":
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    """Parses the command line."""
     parser = argparse.ArgumentParser(
         description="This script synchronizes proxy hosts on a target Nginx server from a source Nginx server"
     )
@@ -408,10 +533,81 @@ if __name__ == "__main__":
         help="Perform a trial run with no changes made to target servers"
     )
 
-    args = parser.parse_args()
+    parser.add_argument(
+        "--config-dir",
+        metavar="<PATH>",
+        help="Folder that holds config.yaml, log.yaml and .env (default: the folder "
+             "of the nginx-sync binary, or of main.py when run from source)"
+    )
+
+    parser.add_argument(
+        "--version",
+        action="store_true",
+        help=f"Show the version recorded in {VERSION_FILE} and exit"
+    )
+
+    return parser.parse_args(argv)
+
+# Set by the first Ctrl-C so further ones are swallowed (see _handle_sigint).
+_STOP_REQUESTED = False
+
+def _handle_sigint(signum: int, frame: Any) -> None:
+    """
+    Stops the sync loop on Ctrl-C and ignores every later Ctrl-C.
+
+    PyInstaller's bootloader forwards the terminal's SIGINT to the program as
+    well, so a single Ctrl-C arrives twice. Raising on both turned the second
+    one into a traceback inside the shutdown code - and that could not be fixed
+    by installing SIG_IGN there, because a signal that is already pending is
+    still delivered before the next bytecode runs. Swallowing repeats here has
+    no such window.
+    """
+    global _STOP_REQUESTED
+    if _STOP_REQUESTED:
+        return
+    _STOP_REQUESTED = True
+    raise KeyboardInterrupt
+
+def run(args: argparse.Namespace) -> int:
+    """Loads the configuration and runs the sync loop; returns an exit code."""
+    load_settings(args.config_dir)
 
     if args.log_level != "NONE":
         logger.setLevel(args.log_level)
 
+    # Fail immediately when an endpoint cannot log in, instead of retrying every
+    # cycle and reporting the 400 that NPM returns for an incomplete payload.
+    missing = missing_credentials()
+    if missing:
+        logger.error(f"No credentials configured for: {', '.join(missing)}")
+        logger.error(
+            f"Create {os.path.join(SETTINGS_DIR, '.env')} with NPM_IDENTITY and NPM_SECRET, "
+            "or add auth_payload to that entry in config.yaml."
+        )
+        return 2
+
     main(period=args.period, dry_run=args.dry_run)
+    return 0
+
+def cli(argv: Optional[List[str]] = None) -> int:
+    """Runs the command line interface and returns a process exit code."""
+    args = parse_args(argv)
+
+    # --version has to work without any configuration: it is what a service
+    # manager or an upgrade script calls to see what it is about to run.
+    if args.version:
+        print(f"nginx-sync {read_version(args.config_dir)}")
+        return 0
+
+    # Ctrl-C is how the loop is normally stopped; see _handle_sigint.
+    signal.signal(signal.SIGINT, _handle_sigint)
+
+    try:
+        return run(args)
+    except KeyboardInterrupt:
+        logger.info("Sync process interrupted by user. Exiting gracefully.")
+        return 130
+
+if __name__ == "__main__":
+    sys.exit(cli())
             

@@ -1,6 +1,10 @@
 certifi==2026.4.22
 charset-normalizer==3.4.7
 idna==3.13
+# Build only: PyInstaller packages the binary built by build_project.py.
+# Pinned so a release binary is reproducible; see .github/workflows/build-linux.yml.
+pyinstaller==6.22.2
+pyinstaller-hooks-contrib==2026.7
 python-dotenv==1.2.2
 PyYAML==6.0.3
 requests==2.33.1
