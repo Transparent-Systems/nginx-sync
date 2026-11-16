@@ -60,7 +60,10 @@ jobs:
         shell: pwsh
         run: |
           $hash = (Get-FileHash dist\nginx-sync.exe -Algorithm SHA256).Hash.ToLower()
-          "$hash  nginx-sync.exe" | Out-File -FilePath dist\nginx-sync.exe.sha256 -Encoding ascii
+          # LF endings and no BOM, so the file also works with
+          # "sha256sum -c nginx-sync.exe.sha256" on Linux/WSL; Out-File would
+          # write CRLF and that trailing \r becomes part of the file name.
+          [System.IO.File]::WriteAllText("$PWD\dist\nginx-sync.exe.sha256", "$hash  nginx-sync.exe`n")
           Get-Content dist\nginx-sync.exe.sha256
       - name: Upload artifact
         uses: actions/upload-artifact@v7
