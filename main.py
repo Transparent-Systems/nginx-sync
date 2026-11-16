@@ -52,7 +52,9 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     if config_path is None:
         config_path = os.path.join(SETTINGS_DIR, "config.yaml")
     try:
-        with open(config_path, 'r') as file:
+        # utf-8-sig accepts both plain UTF-8 and the BOM that Windows editors
+        # such as Notepad write; the default locale encoding would fail on both.
+        with open(config_path, 'r', encoding='utf-8-sig') as file:
             return yaml.safe_load(file)
     except FileNotFoundError:
         # The binary ships without configuration, so this is the first thing a
@@ -70,7 +72,7 @@ def setup_logging(log_config_path: Optional[str] = None) -> logging.Logger:
         log_config_path = os.path.join(SETTINGS_DIR, "log.yaml")
         
     try:
-        with open(log_config_path, 'r') as file:
+        with open(log_config_path, 'r', encoding='utf-8-sig') as file:
             log_cfg = yaml.safe_load(file).get('logging', {})
     except (FileNotFoundError, yaml.YAMLError):
         log_cfg = {}
@@ -97,7 +99,10 @@ def setup_logging(log_config_path: Optional[str] = None) -> logging.Logger:
         file_handler = RotatingFileHandler(
             log_file,
             maxBytes=log_cfg.get('max_bytes', 10485760),
-            backupCount=log_cfg.get('max_backup_count', 3)
+            backupCount=log_cfg.get('max_backup_count', 3),
+            # Write UTF-8 everywhere: the Windows default code page cannot
+            # encode every hostname a log line may quote.
+            encoding='utf-8'
         )
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
@@ -141,7 +146,7 @@ def read_version(directory: Optional[str] = None) -> str:
     for base in candidates:
         path = os.path.join(base, VERSION_FILE)
         try:
-            with open(path, 'r') as file:
+            with open(path, 'r', encoding='utf-8-sig') as file:
                 version = (yaml.safe_load(file) or {}).get('version')
         except (OSError, yaml.YAMLError):
             continue

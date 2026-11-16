@@ -10,6 +10,8 @@ Binary executed successfully on Debian 11 (glibc 2.31), Ubuntu 22.04 (2.35) and 
 and --config-dir <PATH> keeps config.yaml, log.yaml and .env — plus the logs — in one folder of your choosing. 
 Ctrl-C now always shuts down cleanly.
 
+Added build-windows.yml: every release also publishes a single-file nginx-sync.exe (Windows 10/11 x64, no installation). Config files are read as UTF-8, including the BOM that Windows editors add.
+
 ## v1.0.0 - first release
 
 Initial release of Nginx Sync.  

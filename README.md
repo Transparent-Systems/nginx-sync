@@ -46,10 +46,15 @@
       python main.py
     ```
 
-## 📦 Prebuilt Linux Binary
+## 📦 Prebuilt Binaries
 
-Every release tag builds a self-contained Linux binary (no Python needed on the
-server), see `.github/workflows/build-linux.yml`.
+Every release tag builds self-contained binaries — no Python needed on either
+machine, see `.github/workflows/build-linux.yml` and
+`.github/workflows/build-windows.yml`. They are the same program, so you can run
+the Windows one on the workstation you manage the servers from and the Linux one
+on the servers themselves.
+
+### Linux
 
 1. Download `nginx-sync` and `nginx-sync.sha256` from the
    [Releases](https://github.com/Transparent-Systems/nginx-sync/releases) page.
@@ -80,12 +85,47 @@ server), see `.github/workflows/build-linux.yml`.
     version from `log.yaml`. Logs are written to the `logs` folder inside the
     configuration folder.
 
-The binary is built in a Debian bullseye container (glibc 2.31), so it runs on
-Ubuntu 22.04 and newer, Debian 11 and newer, and RHEL 9 and newer, on x86_64.
-To build it yourself run `.venv/bin/python build_project.py` (see
-`.venv/bin/python build_project.py -h`). Name the virtualenv interpreter
-explicitly: after `source .venv/bin/activate`, a `python` that comes from pyenv
-or the system may still be older than the 3.10 that `requirements.txt` needs.
+The Linux binary is built in a Debian bullseye container (glibc 2.31), so it runs
+on Ubuntu 22.04 and newer, Debian 11 and newer, and RHEL 9 and newer, on x86_64.
+
+### Windows
+
+1. Download `nginx-sync.exe` and `nginx-sync.exe.sha256` from the
+   [Releases](https://github.com/Transparent-Systems/nginx-sync/releases) page.
+
+2. Verify the download — the `.sha256` file holds the hash followed by the file
+   name, exactly as `Get-FileHash` prints it:
+
+    ```powershell
+    Get-FileHash .\nginx-sync.exe -Algorithm SHA256
+    ```
+
+3. Put `config.yaml`, `log.yaml` and `.env` in a folder and start the sync from
+   a terminal, so the log lines are visible:
+
+    ```powershell
+    .\nginx-sync.exe --config-dir C:\ProgramData\nginx-sync -p 30
+    ```
+
+    Or keep the configuration next to the exe and just run `.\nginx-sync.exe`.
+    `-h` and `--version` work here too, and the logs go to
+    `logs\nginx_sync.log` inside the configuration folder.
+
+    Windows SmartScreen may warn that the program is unrecognised because the exe
+    is not code-signed: choose **More info → Run anyway**. To run it unattended,
+    start it from Task Scheduler (or with a service wrapper such as NSSM) instead
+    of a console window.
+
+The Windows binary is a single file that carries Python and the C runtime, so it
+needs no installation and runs on Windows 10 and 11 (x64).
+
+### Building it yourself
+
+Run `.venv/bin/python build_project.py` (or `.venv\Scripts\python build_project.py`
+on Windows); `build_project.py -h` shows the options. Name the virtualenv
+interpreter explicitly: after activating the virtualenv, a `python` that comes
+from pyenv or the system may still be older than the 3.10 that
+`requirements.txt` needs.
 
 ## Script Arguments
 You can call `nginx-sync` with several arguments.
