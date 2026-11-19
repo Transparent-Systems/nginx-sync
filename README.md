@@ -1,5 +1,53 @@
 # Nginx Sync
 
+<!-- When nginxy is published, confirm this URL; it is also referenced in the
+     description of this repository, which GitHub can mark as archived. -->
+> [!WARNING]
+> **Deprecated — `nginx-sync` is superseded by [`nginxy`](https://github.com/Transparent-Systems/nginxy).**
+>
+> This project is no longer developed. It has been rewritten in Rust as
+> **nginxy**, which performs the same synchronisation as a single native binary:
+> no Python runtime, no PyInstaller bundle, and a Linux build that is statically
+> linked instead of depending on the glibc of the build image.
+>
+> The code and releases here stay available for reference and for existing
+> deployments — nothing stops working — but new installations should use
+> `nginxy`, and no further features or fixes will be added to this repository.
+
+## Migrating to nginxy
+
+1. Download `nginxy` (Linux) or `nginxy.exe` (Windows) from the nginxy releases.
+2. Keep your configuration folder: `config.yaml` and `log.yaml` are read
+   unchanged, including the BOM that Windows editors add.
+3. Rename the two credential keys in `.env` — nginxy accepts only these names:
+
+    ```bash
+    sed -i 's/^NPM_IDENTITY=/NPM_SOURCE_IDENTITY=/; s/^NPM_SECRET=/NPM_SOURCE_SECRET=/' .env
+    ```
+
+    Without that, nginxy stops at startup with
+    `No credentials configured for: source, …` and names the variables it wants.
+    Prefer placeholders? nginxy also expands `${VAR}` in `config.yaml`, so a
+    committed configuration can carry no addresses or secrets at all.
+
+    While you still need **both** tools on one folder (to compare them, or to
+    roll back), keep both spellings — each tool reads the names it knows and
+    ignores the other pair. Delete the old pair once `nginx-sync` is retired.
+
+4. Start it with the arguments you already use: `-p 30`, `--dry-run`,
+   `-l DEBUG`, `--config-dir /etc/nginx-sync` all behave as before.
+
+The quickest way to compare the two is `nginxy --dry-run -p 0 --config-dir
+<folder>` next to the old tool and a diff of the two log files (ignore the
+timestamps). What differs:
+
+| | nginx-sync | nginxy |
+| --- | --- | --- |
+| Installation | Python 3.10+ or a PyInstaller bundle | one native binary |
+| Linux support | glibc of the build image (bullseye) | statically linked (musl), no glibc dependency |
+| Domain lists in log lines | `['a.com', 'b.com']` | `["a.com", "b.com"]` |
+| `--version` | version from `log.yaml` | `log.yaml`, else the binary's own version |
+
 ![AIP logo](https://aip.transparent.co.nz/wp-content/uploads/2025/06/AIP_grey_transparent_background_github-e1750625832556.png)
 
 ## 🚀 Quick Start
