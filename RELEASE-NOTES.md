@@ -1,6 +1,19 @@
 # Release Notes Nginx Sync
 
 
+## v1.1.1 - project is now deprecated
+
+This is the final release of `nginx-sync`.
+
+This project is no longer developed; it has been rewritten in Rust as
+**nginxy** (https://github.com/Transparent-Systems/nginxy), which performs the
+same synchronisation as a single native binary with no Python runtime and no
+PyInstaller bundle. The README documents how to migrate, including the renamed
+credential keys in `.env`.
+
+The Linux and Windows binaries below remain available and keep working for
+existing deployments, but no further features or fixes will be added.
+
 ## v1.1.0 - add Linux binary
 
 Added build-linux.yml to the GitHub workflows.
